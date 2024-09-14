@@ -1,31 +1,35 @@
-import os
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
+import telebot
+from telebot.types import Message
 from playwright.sync_api import sync_playwright
+import os
 
 # Замените 'YOUR_BOT_TOKEN' на токен вашего бота
 TOKEN = '7332817569:AAG3l2IJugs0geomZCaT9k-YoVcwBXcHAgs'
 
-# Состояния для ConversationHandler
-WAITING_FOR_URL, WAITING_FOR_TEXT = range(2)
+bot = telebot.TeleBot(TOKEN)
 
-def start(update, context):
-    update.message.reply_text('Привет! Отправь мне URL сайта, где есть форма "Message ChatGPT".')
-    return WAITING_FOR_URL
+user_states = {}
 
-def get_url(update, context):
-    url = update.message.text
+@bot.message_handler(commands=['start'])
+def start(message: Message):
+    bot.reply_to(message, 'Привет! Отправь мне URL сайта, где есть форма "Message ChatGPT".')
+    user_states[message.from_user.id] = 'waiting_for_url'
+
+@bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'waiting_for_url')
+def get_url(message: Message):
+    url = message.text
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     
-    context.user_data['url'] = url
-    update.message.reply_text('Теперь отправь мне текст, который нужно ввести в форму.')
-    return WAITING_FOR_TEXT
+    user_states[message.from_user.id] = {'state': 'waiting_for_text', 'url': url}
+    bot.reply_to(message, 'Теперь отправь мне текст, который нужно ввести в форму.')
 
-def fill_form(update, context):
-    url = context.user_data['url']
-    text_to_fill = update.message.text
+@bot.message_handler(func=lambda message: isinstance(user_states.get(message.from_user.id), dict) and user_states[message.from_user.id]['state'] == 'waiting_for_text')
+def fill_form(message: Message):
+    url = user_states[message.from_user.id]['url']
+    text_to_fill = message.text
 
-    update.message.reply_text('Заполняю форму...')
+    bot.reply_to(message, 'Заполняю форму...')
 
     with sync_playwright() as p:
         browser = p.firefox.launch()
@@ -37,39 +41,22 @@ def fill_form(update, context):
             textarea = page.query_selector('textarea[placeholder="Message ChatGPT"]')
             if textarea:
                 textarea.fill(text_to_fill)
-                update.message.reply_text('Форма заполнена успешно.')
+                bot.reply_to(message, 'Форма заполнена успешно.')
                 screenshot = page.screenshot()
-                update.message.reply_photo(screenshot)
+                bot.send_photo(message.chat.id, screenshot)
             else:
-                update.message.reply_text('Форма "Message ChatGPT" не найдена на странице.')
+                bot.reply_to(message, 'Форма "Message ChatGPT" не найдена на странице.')
         except Exception as e:
-            update.message.reply_text(f'Произошла ошибка: {str(e)}')
+            bot.reply_to(message, f'Произошла ошибка: {str(e)}')
         finally:
             browser.close()
 
-    return ConversationHandler.END
+    user_states[message.from_user.id] = 'waiting_for_url'
 
-def cancel(update, context):
-    update.message.reply_text('Операция отменена.')
-    return ConversationHandler.END
-
-def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            WAITING_FOR_URL: [MessageHandler(Filters.text & ~Filters.command, get_url)],
-            WAITING_FOR_TEXT: [MessageHandler(Filters.text & ~Filters.command, fill_form)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    dp.add_handler(conv_handler)
-
-    updater.start_polling()
-    updater.idle()
+@bot.message_handler(commands=['cancel'])
+def cancel(message: Message):
+    user_states[message.from_user.id] = 'waiting_for_url'
+    bot.reply_to(message, 'Операция отменена. Отправьте новый URL, когда будете готовы.')
 
 if __name__ == '__main__':
-    main()
+    bot.polling(none_stop=True)
