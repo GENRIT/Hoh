@@ -21,7 +21,7 @@ def fill_form_and_take_screenshot(url, user_message):
             
             # Ищем поле для сообщения (например, по имени поля)
             print("Ищу поле с надписью 'Message'")
-            message_field_selector = 'textarea[name="message"], input[name="message"], textarea, input'  # Добавил более общий селектор
+            message_field_selector = 'textarea[name="message"], input[name="message"], textarea, input'  # Общий селектор
             
             # Проверяем, существует ли элемент
             message_field = page.query_selector(message_field_selector)
@@ -30,6 +30,10 @@ def fill_form_and_take_screenshot(url, user_message):
                 page.fill(message_field_selector, user_message)  # Заполняем поле сообщением от пользователя
             else:
                 raise Exception("Поле 'Message' не найдено на странице.")
+            
+            # Добавляем задержку в 5 секунд перед созданием скриншота
+            print("Ожидание 5 секунд перед созданием скриншота...")
+            page.wait_for_timeout(5000)  # Задержка в 5 секунд
             
             # Делаем скриншот
             print(f"Создаю скриншот и сохраняю как: {screenshot_path}")
