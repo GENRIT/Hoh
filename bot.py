@@ -1,6 +1,7 @@
 import telebot
 from playwright.sync_api import sync_playwright
 import os
+import time
 
 # Токен вашего телеграм-бота
 API_TOKEN = '7332817569:AAG3l2IJugs0geomZCaT9k-YoVcwBXcHAgs'
@@ -13,52 +14,51 @@ def fill_form_and_take_screenshot(url, user_message):
     screenshot_path = "screenshot.png"
     try:
         with sync_playwright() as p:
-            browser = p.firefox.launch(headless=True)  # Запускаем браузер в headless режиме
-            page = browser.new_page()
-            print(f"Открываю страницу: {url}")
-            page.goto(url)
-            page.wait_for_load_state("networkidle")  # Ждем, пока загрузка страницы завершится
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context()
+            page = context.new_page()
             
-            # Ищем поле для сообщения (например, по имени поля)
-            print("Ищу поле с надписью 'Message ChatGPT'")
-            message_field_selector = 'textarea[name="input"], input[type="text"]'  # Селектор для ввода сообщения
-
-            # Проверяем, существует ли элемент
-            message_field = page.query_selector(message_field_selector)
-            if message_field:
-                print(f"Нашел поле, заполняю его текстом: {user_message}")
-                page.fill(message_field_selector, user_message)  # Заполняем поле сообщением от пользователя
-
-                # Находим кнопку отправки
-                submit_button_selector = 'button[type="submit"], button[aria-label="Send message"]'
-                submit_button = page.query_selector(submit_button_selector)
-
-                if submit_button:
-                    print("Найдено! Отправляю сообщение через кнопку.")
-                    page.click(submit_button_selector)  # Кликаем по кнопке отправки
-                else:
-                    print("Кнопка отправки не найдена. Попробую нажать Enter.")
-                    page.keyboard.press("Enter")  # Альтернативный способ — нажатие Enter
+            print(f"Открываю страницу: {url}")
+            page.goto(url, wait_until="networkidle", timeout=60000)
+            
+            print("Ожидание загрузки страницы...")
+            page.wait_for_load_state("domcontentloaded")
+            
+            print("Поиск поля ввода...")
+            input_selector = 'textarea, input[type="text"]'
+            page.wait_for_selector(input_selector, state="visible", timeout=10000)
+            
+            print(f"Ввод сообщения: {user_message}")
+            page.fill(input_selector, user_message)
+            
+            print("Поиск кнопки отправки...")
+            send_button_selector = 'button[type="submit"], button:has-text("Send")'
+            send_button = page.query_selector(send_button_selector)
+            
+            if send_button:
+                print("Нажатие кнопки отправки...")
+                send_button.click()
             else:
-                raise Exception("Поле для сообщения не найдено на странице.")
-
-            # Ожидание для рендеринга результатов
-            print("Ожидание появления элемента 'Message ChatGPT'...")
-            page.wait_for_selector('text="Message ChatGPT"', timeout=30000)  # Ожидаем до 30 секунд
-
-            # Делаем скриншот
-            print(f"Создаю скриншот и сохраняю как: {screenshot_path}")
+                print("Кнопка не найдена, нажимаю Enter...")
+                page.keyboard.press("Enter")
+            
+            print("Ожидание ответа...")
+            time.sleep(10)  # Даем время на получение ответа
+            
+            print("Создание скриншота...")
             page.screenshot(path=screenshot_path, full_page=True)
-            browser.close()  # Закрываем браузер
-            print("Браузер успешно закрыт.")
+            
+            context.close()
+            browser.close()
+            print("Браузер закрыт.")
 
-        # Проверяем, что файл скриншота был создан
         if not os.path.exists(screenshot_path):
             raise Exception("Скриншот не был сохранен.")
+        
+        return screenshot_path
     except Exception as e:
         print(f"Ошибка при создании скриншота: {e}")
-        screenshot_path = None
-    return screenshot_path
+        return None
 
 # Обрабатываем команду /start
 @bot.message_handler(commands=['start'])
@@ -68,7 +68,6 @@ def send_welcome(message):
 # Обрабатываем все текстовые сообщения
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    # Предполагаем, что пользователь отправляет URL и сообщение через запятую (например, "http://example.com, Привет!")
     if "," in message.text:
         url, user_message = [x.strip() for x in message.text.split(",", 1)]
         if url.startswith("http://") or url.startswith("https://"):
@@ -78,6 +77,7 @@ def handle_message(message):
                 try:
                     with open(screenshot, 'rb') as screenshot_file:
                         bot.send_photo(message.chat.id, screenshot_file)
+                    os.remove(screenshot)  # Удаляем файл после отправки
                 except Exception as e:
                     bot.reply_to(message, f"Не удалось отправить скриншот: {e}")
             else:
