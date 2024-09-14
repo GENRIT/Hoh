@@ -13,28 +13,30 @@ def fill_form_and_take_screenshot(url, user_message):
     screenshot_path = "screenshot.png"
     try:
         with sync_playwright() as p:
-            browser = p.firefox.launch(headless=True)  # Запускаем браузер в headless режиме (без графического интерфейса)
+            browser = p.firefox.launch(headless=True)  # Запускаем браузер в headless режиме
             page = browser.new_page()
             print(f"Открываю страницу: {url}")
             page.goto(url)
             page.wait_for_load_state("networkidle")  # Ждем, пока загрузка страницы завершится
-
+            
             # Ищем поле для сообщения (например, по имени поля)
             print("Ищу поле с надписью 'Message'")
-            message_field_selector = 'textarea[name="message"], input[name="message"]'  # Можно настроить селекторы под сайт
-
-            if page.query_selector(message_field_selector):
+            message_field_selector = 'textarea[name="message"], input[name="message"], textarea, input'  # Добавил более общий селектор
+            
+            # Проверяем, существует ли элемент
+            message_field = page.query_selector(message_field_selector)
+            if message_field:
                 print(f"Нашел поле, заполняю его текстом: {user_message}")
                 page.fill(message_field_selector, user_message)  # Заполняем поле сообщением от пользователя
             else:
                 raise Exception("Поле 'Message' не найдено на странице.")
-
+            
             # Делаем скриншот
             print(f"Создаю скриншот и сохраняю как: {screenshot_path}")
             page.screenshot(path=screenshot_path)
             browser.close()  # Закрываем браузер
             print("Браузер успешно закрыт.")
-
+        
         # Проверяем, что файл скриншота был создан
         if not os.path.exists(screenshot_path):
             raise Exception("Скриншот не был сохранен.")
