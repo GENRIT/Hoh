@@ -12,7 +12,7 @@ user_states = {}
 
 @bot.message_handler(commands=['start'])
 def start(message: Message):
-    bot.reply_to(message, 'Привет! Отправь мне URL сайта, где есть форма "Message ChatGPT".')
+    bot.reply_to(message, 'Привет! Отправь мне URL сайта, где есть форма для отправки сообщений.')
     user_states[message.from_user.id] = 'waiting_for_url'
 
 @bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'waiting_for_url')
@@ -37,15 +37,16 @@ def fill_form(message: Message):
         page.goto(url)
         
         try:
-            # Ищем текстовое поле с плейсхолдером "Message ChatGPT"
-            textarea = page.query_selector('textarea[placeholder="Message ChatGPT"]')
-            if textarea:
-                textarea.fill(text_to_fill)
+            # Ищем последнее текстовое поле на странице
+            textareas = page.query_selector_all('textarea')
+            if textareas:
+                last_textarea = textareas[-1]
+                last_textarea.fill(text_to_fill)
                 bot.reply_to(message, 'Форма заполнена успешно.')
                 screenshot = page.screenshot()
                 bot.send_photo(message.chat.id, screenshot)
             else:
-                bot.reply_to(message, 'Форма "Message ChatGPT" не найдена на странице.')
+                bot.reply_to(message, 'На странице не найдено текстовых полей.')
         except Exception as e:
             bot.reply_to(message, f'Произошла ошибка: {str(e)}')
         finally:
