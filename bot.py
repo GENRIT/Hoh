@@ -18,7 +18,7 @@ def fill_form_and_take_screenshot(url, user_message):
             print(f"Открываю страницу: {url}")
             page.goto(url)
             page.wait_for_load_state("networkidle")  # Ждем, пока загрузка страницы завершится
-
+            
             # Ищем поле для сообщения (например, по имени поля)
             print("Ищу поле с надписью 'Message'")
             message_field_selector = 'textarea[name="message"], input[name="message"], textarea, input'  # Общий селектор
