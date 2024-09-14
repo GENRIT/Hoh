@@ -37,7 +37,7 @@ def fill_form(message: Message):
         page.goto(url)
         
         try:
-            # Ищем текстовое поле рядом с "Message ChatGPT"
+            # Ищем текстовое поле с плейсхолдером "Message ChatGPT"
             textarea = page.query_selector('textarea[placeholder="Message ChatGPT"]')
             if textarea:
                 textarea.fill(text_to_fill)
