@@ -20,7 +20,7 @@ def fill_form_and_take_screenshot(url, user_message):
             page.wait_for_load_state("networkidle")  # Ждем, пока загрузка страницы завершится
             
             # Ищем поле для сообщения (например, по имени поля)
-            print("Ищу поле с надписью 'Message'")
+            print("Ищу поле с надписью 'Message ChatGPT'")
             message_field_selector = 'textarea[name="input"], input[type="text"]'  # Селектор для ввода сообщения
 
             # Проверяем, существует ли элемент
