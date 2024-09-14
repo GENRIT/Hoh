@@ -8,9 +8,8 @@ API_TOKEN = '7332817569:AAG3l2IJugs0geomZCaT9k-YoVcwBXcHAgs'
 # Создаем экземпляр бота
 bot = telebot.TeleBot(API_TOKEN)
 
-# Функция для заполнения поля и создания скриншота
-def fill_form_and_take_screenshot(url, user_message):
-    screenshot_path = "screenshot.png"
+# Функция для заполнения поля и получения сообщений с сайта
+def fill_form_and_get_response(url, user_message):
     try:
         with sync_playwright() as p:
             browser = p.firefox.launch(headless=True)  # Запускаем браузер в headless режиме
@@ -28,31 +27,32 @@ def fill_form_and_take_screenshot(url, user_message):
             if message_field:
                 print(f"Нашел поле, заполняю его текстом: {user_message}")
                 page.fill(message_field_selector, user_message)  # Заполняем поле сообщением от пользователя
+                page.keyboard.press('Enter')  # Имитация нажатия на Enter после ввода текста
             else:
                 raise Exception("Поле 'Message' не найдено на странице.")
             
-            # Добавляем задержку в 5 секунд перед созданием скриншота
-            print("Ожидание 5 секунд перед созданием скриншота...")
-            page.wait_for_timeout(5000)  # Задержка в 5 секунд
+            # Ждем появления ответа на сайте (например, в блоке с чат-сообщениями)
+            print("Ожидание появления сообщения на сайте...")
+            page.wait_for_timeout(3000)  # Ждем 3 секунды для обновления страницы
             
-            # Делаем скриншот
-            print(f"Создаю скриншот и сохраняю как: {screenshot_path}")
-            page.screenshot(path=screenshot_path)
-            browser.close()  # Закрываем браузер
-            print("Браузер успешно закрыт.")
-        
-        # Проверяем, что файл скриншота был создан
-        if not os.path.exists(screenshot_path):
-            raise Exception("Скриншот не был сохранен.")
+            # Ищем элемент с ответом (нужно изменить селектор в зависимости от сайта)
+            response_selector = 'div.chat-response'  # Замените на актуальный селектор блока с ответами
+            response_element = page.query_selector(response_selector)
+            if response_element:
+                response_text = response_element.text_content()  # Получаем текст ответа
+                print(f"Получено сообщение с сайта: {response_text}")
+                return response_text
+            else:
+                raise Exception("Ответное сообщение не найдено на странице.")
+    
     except Exception as e:
-        print(f"Ошибка при создании скриншота: {e}")
-        screenshot_path = None
-    return screenshot_path
+        print(f"Ошибка при получении сообщения: {e}")
+        return None
 
 # Обрабатываем команду /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Отправь мне ссылку и текст, который ты хочешь вставить, и я сделаю скриншот сайта.")
+    bot.reply_to(message, "Привет! Отправь мне ссылку и текст, который ты хочешь вставить, и я покажу ответ с сайта.")
 
 # Обрабатываем все текстовые сообщения
 @bot.message_handler(func=lambda message: True)
@@ -61,16 +61,12 @@ def handle_message(message):
     if "," in message.text:
         url, user_message = [x.strip() for x in message.text.split(",", 1)]
         if url.startswith("http://") or url.startswith("https://"):
-            bot.reply_to(message, "Подожди, вставляю сообщение и делаю скриншот сайта...")
-            screenshot = fill_form_and_take_screenshot(url, user_message)
-            if screenshot:
-                try:
-                    with open(screenshot, 'rb') as screenshot_file:
-                        bot.send_photo(message.chat.id, screenshot_file)
-                except Exception as e:
-                    bot.reply_to(message, f"Не удалось отправить скриншот: {e}")
+            bot.reply_to(message, "Подожди, вставляю сообщение и получаю ответ с сайта...")
+            response_text = fill_form_and_get_response(url, user_message)
+            if response_text:
+                bot.reply_to(message, f"ChatGPT: {response_text}")
             else:
-                bot.reply_to(message, "Не удалось сделать скриншот. Попробуйте еще раз.")
+                bot.reply_to(message, "Не удалось получить ответ с сайта. Попробуйте еще раз.")
         else:
             bot.reply_to(message, "Пожалуйста, отправь правильную ссылку (с http:// или https://).")
     else:
