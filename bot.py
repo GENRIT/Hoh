@@ -42,9 +42,9 @@ def fill_form_and_take_screenshot(url, user_message):
             else:
                 raise Exception("Поле для сообщения не найдено на странице.")
 
-            # Ожидание для рендеринга результатов (лучше дождаться конкретного элемента)
-            print("Ожидание 5 секунд перед созданием скриншота...")
-            page.wait_for_timeout(5000)  # Задержка в 5 секунд
+            # Ожидание для рендеринга результатов
+            print("Ожидание появления элемента 'Message ChatGPT'...")
+            page.wait_for_selector('text="Message ChatGPT"', timeout=30000)  # Ожидаем до 30 секунд
 
             # Делаем скриншот
             print(f"Создаю скриншот и сохраняю как: {screenshot_path}")
