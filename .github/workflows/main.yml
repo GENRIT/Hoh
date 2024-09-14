@@ -10,7 +10,6 @@ on:
 
 jobs:
   test:
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -31,7 +30,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyTelegramBotAPI
         pip install playwright
-        playwright install
+        npx playwright install --with-deps  # Установка браузеров Playwright
+
+    - name: Install additional dependencies for Firefox
+      run: sudo apt-get install -y libatk1.0-0 libatk-bridge2.0-0 libcups2 libdbus-glib-1-2 libxcomposite1 libxdamage1 libxrandr2 libgbm-dev
 
     - name: Lint with flake8
       run: |
